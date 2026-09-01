@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   SCHOOL_INFO, 
   SECTIONS_25_DATA 
@@ -21,15 +21,89 @@ import {
   Bookmark, 
   Compass,
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  Trophy,
+  RotateCcw,
+  CheckCheck
 } from 'lucide-react';
+
+const STORAGE_KEY_COMPLETED = 'ep_history_completed_sections_cap07';
+const STORAGE_KEY_BOOKMARKS = 'ep_history_bookmarked_sections_cap07';
 
 export default function App() {
   const [currentSectionId, setCurrentSectionId] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
-  const [bookmarkedIds, setBookmarkedIds] = useState<number[]>([]);
+  const [bookmarkedIds, setBookmarkedIds] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_BOOKMARKS);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [completedSectionIds, setCompletedSectionIds] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_COMPLETED);
+      return saved ? JSON.parse(saved) : [1]; // Start with section 1 completed on first load
+    } catch {
+      return [1];
+    }
+  });
   const [onlyBookmarks, setOnlyBookmarks] = useState<boolean>(false);
+  const [showCelebration, setShowCelebration] = useState<boolean>(false);
+
+  // Sync to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_COMPLETED, JSON.stringify(completedSectionIds));
+    } catch (e) {
+      console.error(e);
+    }
+
+    if (completedSectionIds.length === 25) {
+      setShowCelebration(true);
+    }
+  }, [completedSectionIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(bookmarkedIds));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [bookmarkedIds]);
+
+  // Automatic reading engagement observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.4) {
+            const secId = Number(entry.target.getAttribute('data-sec-id'));
+            if (secId && !isNaN(secId)) {
+              setCurrentSectionId(secId);
+              // Auto mark as completed upon deep viewing
+              setCompletedSectionIds((prev) => 
+                prev.includes(secId) ? prev : [...prev, secId]
+              );
+            }
+          }
+        });
+      },
+      { threshold: [0.4], rootMargin: '-80px 0px -20% 0px' }
+    );
+
+    SECTIONS_25_DATA.forEach((sec) => {
+      const el = document.getElementById(`secao-${sec.number}`);
+      if (el) {
+        el.setAttribute('data-sec-id', String(sec.id));
+        observer.observe(el);
+      }
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const categories = ['Todas', 'Contexto', 'Estatísticas', 'Cotidiano', 'Analogias', 'Movimentos', 'Teorias', 'Comuna', 'Legado', 'Atividades'];
 
@@ -37,6 +111,22 @@ export default function App() {
     setBookmarkedIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
+  };
+
+  const toggleSectionComplete = (id: number) => {
+    setCompletedSectionIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const markAllCompleted = () => {
+    setCompletedSectionIds(SECTIONS_25_DATA.map(s => s.id));
+    setShowCelebration(true);
+  };
+
+  const resetProgress = () => {
+    setCompletedSectionIds([1]);
+    setShowCelebration(false);
   };
 
   const handleSelectSection = (id: number) => {
@@ -47,6 +137,13 @@ export default function App() {
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
+    }
+  };
+
+  const handleNextSection = (currentId: number) => {
+    const nextId = currentId + 1;
+    if (nextId <= 25) {
+      handleSelectSection(nextId);
     }
   };
 
@@ -62,14 +159,20 @@ export default function App() {
     return matchesCategory && matchesSearch && matchesBookmark;
   });
 
+  const completionRate = Math.round((completedSectionIds.length / 25) * 100);
+
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-[#1A202C] font-sans antialiased flex flex-col selection:bg-[#FD7600]/30 selection:text-[#016E01]">
-      {/* Top Academic Header */}
+      {/* Top Academic Header with Real-time Study Progress Bar */}
       <Header
         currentSectionId={currentSectionId}
         onSelectSection={handleSelectSection}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
+        completedSectionIds={completedSectionIds}
+        totalSections={25}
+        onMarkAllCompleted={markAllCompleted}
+        onResetProgress={resetProgress}
       />
 
       {/* Main Container */}
@@ -131,8 +234,47 @@ export default function App() {
               </div>
             </div>
 
+            {/* Student Study Progress Summary Card in Hero */}
+            <div className="w-full bg-black/25 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-[#FD7600]" />
+                  <span className="font-serif font-bold text-sm sm:text-base text-white">
+                    Seu Progresso de Leitura do Material:
+                  </span>
+                  <span className="font-mono font-black text-xs bg-[#FD7600] text-white px-2 py-0.5 rounded-full">
+                    {completedSectionIds.length} / 25 Seções ({completionRate}%)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    onClick={markAllCompleted}
+                    className="hover:text-[#FD7600] transition-colors flex items-center gap-1 text-white/80 cursor-pointer underline"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" /> Marcar Todas
+                  </button>
+                  <span className="text-white/40">|</span>
+                  <button
+                    onClick={resetProgress}
+                    className="hover:text-[#FD7600] transition-colors flex items-center gap-1 text-white/80 cursor-pointer underline"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Zerar
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress bar fill */}
+              <div className="w-full bg-white/20 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#FD7600] to-amber-300 transition-all duration-500 rounded-full"
+                  style={{ width: `${Math.max(completionRate, 3)}%` }}
+                />
+              </div>
+            </div>
+
             {/* Quick Hero Indicator Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full pt-4 text-xs font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full pt-2 text-xs font-mono">
               <div className="bg-black/20 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10 shadow-xs">
                 <span className="text-[#FD7600] font-black text-xl block font-mono">16h</span>
                 <span className="text-[#FBFBFB]/90 text-[11px] font-sans">Jornada Máxima</span>
@@ -153,6 +295,39 @@ export default function App() {
           </div>
         </section>
 
+        {/* 100% COMPLETION CONGRATULATIONS BANNER */}
+        {showCelebration && completedSectionIds.length === 25 && (
+          <div 
+            id="completion-celebration-banner"
+            className="mb-8 bg-gradient-to-r from-[#016E01] via-[#015501] to-[#016E01] text-white rounded-3xl p-6 sm:p-8 border-4 border-[#FD7600] shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-300"
+          >
+            <div className="flex items-center gap-4 text-left">
+              <div className="w-16 h-16 rounded-2xl bg-[#FD7600] text-white flex items-center justify-center shrink-0 shadow-lg">
+                <Trophy className="w-8 h-8 text-white animate-bounce" />
+              </div>
+              <div>
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 block">
+                  Conquista Pedagógica • 100% do Material Lido
+                </span>
+                <h3 className="font-serif text-2xl font-bold text-white">
+                  Parabéns! Você completou todas as 25 seções!
+                </h3>
+                <p className="text-xs sm:text-sm text-white/90 mt-1 max-w-xl">
+                  Você concluiu todo o estudo do Capítulo 07 com o Prof. Anderson Firmo. Agora teste seus conhecimentos e emita seu Certificado Oficial de História.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleSelectSection(24)}
+              className="px-6 py-3.5 rounded-2xl bg-[#FD7600] hover:bg-[#e06800] text-white font-bold text-sm shadow-md transition-all cursor-pointer shrink-0 flex items-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-white" />
+              <span>Fazer o Quiz & Gerar Certificado</span>
+            </button>
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* INTERACTIVE 25-SECTION SELECTOR GRID (NAVIGATION BAR) */}
         {/* ========================================================================= */}
@@ -160,12 +335,17 @@ export default function App() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#016E01]/10 pb-4 mb-4">
             <div className="flex items-center gap-2">
               <Compass className="w-5 h-5 text-[#FD7600]" />
-              <h3 className="font-serif font-bold text-base sm:text-lg text-[#016E01]">
-                Mapa Rápido das 25 Seções Didáticas
-              </h3>
+              <div>
+                <h3 className="font-serif font-bold text-base sm:text-lg text-[#016E01]">
+                  Mapa Rápido das 25 Seções Didáticas
+                </h3>
+                <p className="text-xs text-[#1A202C]/70">
+                  {completedSectionIds.length} de 25 concluídas ({completionRate}%)
+                </p>
+              </div>
             </div>
 
-            {/* Bookmarks Toggle */}
+            {/* Bookmarks & Quick Actions Toggle */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setOnlyBookmarks(!onlyBookmarks)}
@@ -181,24 +361,31 @@ export default function App() {
             </div>
           </div>
 
-          {/* 25 Numbered Quick Jump Buttons */}
+          {/* 25 Numbered Quick Jump Buttons with Real-time Completion Checkmarks */}
           <div className="grid grid-cols-5 sm:grid-cols-10 lg:grid-cols-25 gap-1.5">
             {SECTIONS_25_DATA.map((sec) => {
               const isSelected = currentSectionId === sec.id;
               const isBookmarked = bookmarkedIds.includes(sec.id);
+              const isCompleted = completedSectionIds.includes(sec.id);
+
               return (
                 <button
                   key={sec.id}
                   id={`jump-btn-sec-${sec.id}`}
                   onClick={() => handleSelectSection(sec.id)}
-                  title={`${sec.number}. ${sec.title}`}
+                  title={`${sec.number}. ${sec.title} ${isCompleted ? '(Concluída ✓)' : ''}`}
                   className={`p-2 rounded-xl text-xs font-mono font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer ${
                     isSelected
                       ? 'bg-[#FD7600] text-white ring-2 ring-[#FD7600] shadow-sm font-black'
+                      : isCompleted
+                      ? 'bg-emerald-50 text-[#016E01] border border-emerald-300 hover:bg-[#016E01] hover:text-white'
                       : 'bg-[#FBFBFB] text-[#016E01] hover:bg-[#016E01] hover:text-white border border-[#016E01]/15'
                   }`}
                 >
-                  <span>{sec.number}</span>
+                  <span className="flex items-center gap-0.5">
+                    {sec.number}
+                    {isCompleted && !isSelected && <span className="text-[9px] text-[#016E01] font-black">✓</span>}
+                  </span>
                   {isBookmarked && (
                     <span className="w-1.5 h-1.5 rounded-full bg-[#FD7600] absolute top-1 right-1" />
                   )}
@@ -238,6 +425,9 @@ export default function App() {
               section={sec}
               isBookmarked={bookmarkedIds.includes(sec.id)}
               onToggleBookmark={toggleBookmark}
+              isCompleted={completedSectionIds.includes(sec.id)}
+              onToggleComplete={toggleSectionComplete}
+              onNextSection={sec.id < 25 ? () => handleNextSection(sec.id) : undefined}
             >
               {/* Embedded Specialized Interactive Modules at exact corresponding section numbers */}
               

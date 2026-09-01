@@ -18,6 +18,9 @@ interface SectionItemProps {
   section: SectionData;
   isBookmarked: boolean;
   onToggleBookmark: (id: number) => void;
+  isCompleted: boolean;
+  onToggleComplete: (id: number) => void;
+  onNextSection?: () => void;
   children?: React.ReactNode;
 }
 
@@ -25,6 +28,9 @@ export const SectionItem: React.FC<SectionItemProps> = ({
   section,
   isBookmarked,
   onToggleBookmark,
+  isCompleted,
+  onToggleComplete,
+  onNextSection,
   children
 }) => {
   const [copied, setCopied] = useState(false);
@@ -63,19 +69,30 @@ export const SectionItem: React.FC<SectionItemProps> = ({
   return (
     <article
       id={`secao-${section.number}`}
-      className="scroll-mt-24 my-8 bg-white rounded-2xl border-2 border-[#016E01]/20 shadow-sm overflow-hidden transition-all hover:border-[#FD7600]/60 hover:shadow-md"
+      className={`scroll-mt-24 my-8 bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
+        isCompleted 
+          ? 'border-[#016E01] ring-1 ring-[#016E01]/20 shadow-md' 
+          : 'border-[#016E01]/20 hover:border-[#FD7600]/60 hover:shadow-md'
+      }`}
     >
       {/* Section Header Banner with Brand Palette (#FBFBFB background, #FD7600 badges, #016E01 titles) */}
       <div className="bg-[#FBFBFB] border-b border-[#016E01]/15 p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-[#FD7600] text-white font-mono font-black text-lg flex items-center justify-center shrink-0 shadow-sm">
-            {section.number}
+          <div className={`w-12 h-12 rounded-xl text-white font-mono font-black text-lg flex items-center justify-center shrink-0 shadow-sm transition-all ${
+            isCompleted ? 'bg-[#016E01] ring-2 ring-[#016E01]' : 'bg-[#FD7600]'
+          }`}>
+            {isCompleted ? '✓' : section.number}
           </div>
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="text-[11px] uppercase font-mono tracking-wider font-bold text-[#016E01] bg-[#016E01]/10 px-2.5 py-0.5 rounded-md">
                 Seção {section.number} de 25 • {section.category}
               </span>
+              {isCompleted && (
+                <span className="text-[10px] font-mono font-bold text-[#016E01] bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Check className="w-3 h-3 text-[#016E01]" /> Concluída
+                </span>
+              )}
             </div>
             <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-[#016E01] leading-tight">
               {section.title}
@@ -84,7 +101,22 @@ export const SectionItem: React.FC<SectionItemProps> = ({
         </div>
 
         {/* Section Utility Actions */}
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+          {/* Mark Section Complete Button */}
+          <button
+            onClick={() => onToggleComplete(section.id)}
+            id={`complete-btn-sec-${section.id}`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+              isCompleted
+                ? 'bg-[#016E01] text-white border-[#016E01] hover:bg-[#015501]'
+                : 'bg-white text-[#016E01] border-[#016E01]/30 hover:bg-[#016E01]/10 hover:border-[#016E01]'
+            }`}
+            title={isCompleted ? 'Desmarcar como concluída' : 'Marcar seção como estudada/concluída'}
+          >
+            <Check className={`w-4 h-4 ${isCompleted ? 'text-white stroke-[3]' : 'text-[#016E01]'}`} />
+            <span>{isCompleted ? 'Concluída' : 'Marcar como Lida'}</span>
+          </button>
+
           <button
             onClick={handleToggleSpeech}
             id={`speech-btn-sec-${section.id}`}
@@ -208,6 +240,39 @@ export const SectionItem: React.FC<SectionItemProps> = ({
             </div>
           </div>
         )}
+
+        {/* Section Completion Callout Bar at Bottom */}
+        <div className="mt-8 pt-5 border-t border-[#016E01]/15 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#FBFBFB] p-4 rounded-xl">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[#1A202C]">
+              {isCompleted ? '🎉 Seção estudada com sucesso!' : 'Terminou de ler esta seção?'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onToggleComplete(section.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                isCompleted
+                  ? 'bg-[#016E01] text-white hover:bg-[#015501]'
+                  : 'bg-[#FD7600] text-white hover:bg-[#e06800]'
+              }`}
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>{isCompleted ? 'Seção Concluída ✓' : 'Marcar Seção como Lida'}</span>
+            </button>
+
+            {onNextSection && (
+              <button
+                onClick={onNextSection}
+                className="px-3 py-2 rounded-xl text-xs font-bold bg-white text-[#016E01] border border-[#016E01]/20 hover:border-[#FD7600] hover:text-[#FD7600] transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>Próxima</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </article>
   );

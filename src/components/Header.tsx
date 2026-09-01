@@ -18,18 +18,39 @@ interface HeaderProps {
   onSelectSection: (id: number) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
+  completedSectionIds: number[];
+  totalSections: number;
+  onMarkAllCompleted?: () => void;
+  onResetProgress?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentSectionId,
   onSelectSection,
   searchTerm,
-  onSearchChange
+  onSearchChange,
+  completedSectionIds,
+  totalSections,
+  onMarkAllCompleted,
+  onResetProgress
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const completedCount = completedSectionIds.length;
+  const progressPercent = Math.min(100, Math.round((completedCount / totalSections) * 100));
+
+  const getProgressStatus = () => {
+    if (progressPercent === 100) return { label: '100% Concluído • Mestre do Século XIX!', color: 'text-amber-300', icon: '🏆' };
+    if (progressPercent >= 80) return { label: 'Reta Final! Quase tudo lido', color: 'text-orange-200', icon: '🔥' };
+    if (progressPercent >= 50) return { label: 'Metade do caminho percorrida!', color: 'text-emerald-200', icon: '⚡' };
+    if (progressPercent >= 20) return { label: 'Bons avanços nos estudos!', color: 'text-white/90', icon: '📖' };
+    return { label: 'Iniciando os estudos do Capítulo 07', color: 'text-white/80', icon: '🚀' };
+  };
+
+  const status = getProgressStatus();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -95,75 +116,107 @@ export const Header: React.FC<HeaderProps> = ({
         className={`sticky top-0 z-40 transition-all duration-300 ${
           isScrolled 
             ? 'bg-[#FBFBFB]/95 backdrop-blur-md shadow-md border-b border-[#016E01]/15 py-2' 
-            : 'bg-[#FBFBFB] border-b border-[#016E01]/10 py-3'
+            : 'bg-[#FBFBFB] border-b border-[#016E01]/10 py-2.5'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
-          {/* Official Attached Logo */}
-          <div className="flex items-center gap-3">
-            <a 
-              href="#secao-01" 
-              onClick={(e) => { e.preventDefault(); onSelectSection(1); }}
-              className="flex items-center group cursor-pointer"
-            >
-              <EscolaLogo size={isScrolled ? 'sm' : 'md'} />
-            </a>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-4">
+            {/* Official Attached Logo */}
+            <div className="flex items-center gap-3">
+              <a 
+                href="#secao-01" 
+                onClick={(e) => { e.preventDefault(); onSelectSection(1); }}
+                className="flex items-center group cursor-pointer"
+              >
+                <EscolaLogo size={isScrolled ? 'sm' : 'md'} />
+              </a>
+            </div>
 
-          {/* Center search input */}
-          <div className="hidden lg:flex items-center flex-1 max-w-md mx-6">
-            <div className="relative w-full">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#016E01]/50" />
-              <input
-                id="header-search-input"
-                type="text"
-                placeholder="Buscar nas 25 seções (ex: mais-valia, Marx, Comuna, 1848)..."
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full bg-[#016E01]/5 focus:bg-white text-[#1A202C] text-xs sm:text-sm pl-9 pr-4 py-2 rounded-full border border-[#016E01]/20 focus:border-[#FD7600] focus:ring-2 focus:ring-[#FD7600]/20 outline-none transition-all placeholder:text-[#1A202C]/50"
-              />
-              {searchTerm && (
-                <button 
-                  onClick={() => onSearchChange('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-[#1A202C]/40 hover:text-[#FD7600]"
-                >
-                  ✕
-                </button>
-              )}
+            {/* Center search input */}
+            <div className="hidden lg:flex items-center flex-1 max-w-md mx-6">
+              <div className="relative w-full">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#016E01]/50" />
+                <input
+                  id="header-search-input"
+                  type="text"
+                  placeholder="Buscar nas 25 seções (ex: mais-valia, Marx, Comuna, 1848)..."
+                  value={searchTerm}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="w-full bg-[#016E01]/5 focus:bg-white text-[#1A202C] text-xs sm:text-sm pl-9 pr-4 py-2 rounded-full border border-[#016E01]/20 focus:border-[#FD7600] focus:ring-2 focus:ring-[#FD7600]/20 outline-none transition-all placeholder:text-[#1A202C]/50"
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={() => onSearchChange('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-[#1A202C]/40 hover:text-[#FD7600]"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Right Action Buttons & Progress Quick Glance */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Interactive Progress Badge */}
+              <div 
+                id="header-study-progress-badge"
+                title={`${completedCount} de ${totalSections} seções concluídas`}
+                className="hidden md:flex items-center gap-2 bg-[#016E01]/10 border border-[#016E01]/20 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-[#016E01]"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#FD7600]" />
+                <span>Progresso:</span>
+                <span className="text-[#FD7600] font-black">{completedCount}/{totalSections}</span>
+                <span className="bg-[#016E01] text-white text-[10px] px-1.5 py-0.2 rounded font-mono">
+                  {progressPercent}%
+                </span>
+              </div>
+
+              <button
+                id="header-drawer-toggle"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="flex items-center gap-2 bg-[#FD7600] hover:bg-[#e06800] text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+                aria-label="Abrir Índice das 25 Seções"
+              >
+                {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                <span className="hidden sm:inline">Índice das 25 Seções</span>
+                <span className="bg-white text-[#FD7600] font-mono font-black text-[11px] px-1.5 py-0.2 rounded-md">25</span>
+              </button>
+
+              <button
+                onClick={handleShare}
+                id="header-share-btn"
+                className="hidden sm:flex items-center gap-1.5 bg-[#016E01]/10 hover:bg-[#016E01]/20 text-[#016E01] px-3 py-2 rounded-xl font-semibold text-xs border border-[#016E01]/20 transition-colors cursor-pointer"
+                title="Copiar link da aula"
+              >
+                <Share2 className="w-3.5 h-3.5 text-[#016E01]" />
+                <span>{copiedLink ? 'Copiado!' : 'Compartilhar'}</span>
+              </button>
             </div>
           </div>
 
-          {/* Right Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              id="header-drawer-toggle"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center gap-2 bg-[#FD7600] hover:bg-[#e06800] text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
-              aria-label="Abrir Índice das 25 Seções"
-            >
-              {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              <span className="hidden sm:inline">Índice das 25 Seções</span>
-              <span className="bg-white text-[#FD7600] font-mono font-black text-[11px] px-1.5 py-0.2 rounded-md">25</span>
-            </button>
+          {/* VISUAL INTERACTIVE PROGRESS BAR ON TOP */}
+          <div className="mt-2.5 pt-2 border-t border-[#016E01]/10">
+            <div className="flex items-center justify-between text-[11px] mb-1 font-sans">
+              <div className="flex items-center gap-1.5 font-bold text-[#016E01]">
+                <span>{status.icon}</span>
+                <span className="font-mono text-[#FD7600] font-black">{completedCount} de {totalSections} seções</span>
+                <span className="hidden sm:inline font-normal text-[#1A202C]/70">concluídas</span>
+                <span className="text-[#016E01]/40">•</span>
+                <span className="text-xs font-semibold text-[#016E01]">{status.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-black text-[#FD7600] text-xs">{progressPercent}%</span>
+              </div>
+            </div>
 
-            <button
-              onClick={handleShare}
-              id="header-share-btn"
-              className="hidden sm:flex items-center gap-1.5 bg-[#016E01]/10 hover:bg-[#016E01]/20 text-[#016E01] px-3 py-2 rounded-xl font-semibold text-xs border border-[#016E01]/20 transition-colors cursor-pointer"
-              title="Copiar link da aula"
-            >
-              <Share2 className="w-3.5 h-3.5 text-[#016E01]" />
-              <span>{copiedLink ? 'Copiado!' : 'Compartilhar'}</span>
-            </button>
+            {/* Interactive Progress Track */}
+            <div className="w-full bg-[#016E01]/10 h-2 rounded-full overflow-hidden p-0.5 relative shadow-inner">
+              <div 
+                className="h-full rounded-full bg-gradient-to-r from-[#FD7600] via-[#C9A84C] to-[#016E01] transition-all duration-500 ease-out shadow-xs"
+                style={{ width: `${Math.max(progressPercent, 2)}%` }}
+              />
+            </div>
           </div>
-        </div>
-
-        {/* Real-time reading progress bar */}
-        <div className="w-full bg-[#016E01]/10 h-1 mt-2">
-          <div 
-            className="bg-gradient-to-r from-[#FD7600] via-[#016E01] to-[#C9A84C] h-1 transition-all duration-150"
-            style={{ width: `${scrollProgress}%` }}
-          />
         </div>
       </header>
 
@@ -241,8 +294,13 @@ export const Header: React.FC<HeaderProps> = ({
                       {sec.number}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold leading-tight line-clamp-1">
-                        {sec.title}
+                      <div className="text-xs font-semibold leading-tight line-clamp-1 flex items-center justify-between gap-1">
+                        <span>{sec.title}</span>
+                        {completedSectionIds.includes(sec.id) && (
+                          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/40 px-1.5 py-0.2 rounded shrink-0">
+                            ✓ Lida
+                          </span>
+                        )}
                       </div>
                       <div className={`text-[11px] line-clamp-1 mt-0.5 ${
                         currentSectionId === sec.id ? 'text-white/80' : 'text-[#1A202C]/60'
